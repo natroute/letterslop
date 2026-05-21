@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <style>
+            :root {
+                color-scheme: light dark;
+            }
+
+            html, body {
+                height: 100%;
+            }
+
+            body {
+                margin: 0;
+                font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
+            }
+
+            input, button {
+                font: inherit;
+            }
+            
+            #app {
+                margin: 0 auto;
+                box-sizing: border-box;
+                max-width: 800px;
+                padding: 20px;
+
+                .inputs {
+                    display: flex;
+                    gap: 1em;
+
+                    #init-word-input {
+                        flex: 1 0 0;
+                    }
+
+                    #step-number-button {
+                        width: 5em;
+                    }
+                }
+
+                #steps {
+                    list-style: none;
+                    padding: 0;
+
+                    > li {
+                        padding: 0.2em 0.5em;
+
+                        &[data-script='lat'] {
+                            background: #f002;
+                        }
+
+                        &[data-script='cyr'] {
+                            background: #00f2;
+                        }
+                    }
+                }
+            }
+        </style>
+        <title>Document</title>
+    </head>
+    <body>
+        <div id='app'>
+            <h1>cyrillic letterslop</h1>
+
+            <div class='inputs'>
+                <select id='script-input' autocomplete='off'>
+                    <option value='lat'>Latin</option>
+                    <option value='cyr'>Cyrillic</option>
+                </select>
+                <input id='init-word-input' type='text' autocomplete='off'>
+                <button id='step-button'>Step</button>
+                <input id='step-count-input' type='number' min='2' max='512' step='2' value='2' autocomplete='off'>
+            </div>
+
+            <ol id='steps'></ol>
+        </div>
+
+        <script>
+            /** @type [string, string][] */
+            const latToCyrTable = [
+                ['ch', 'ч'],
+                ['sh', 'ш'],
+                ['zh', 'ж'],
+                ['kh', 'х'],
+                ['shch', 'щ'],
+                ['ja', 'я'],
+                ['jo', 'ё'],
+                ['ju', 'ю'],
+                ['aj', 'ай'],
+                ['ej', 'ей'],
+                ['ij', 'ий'],
+                ['oj', 'ой'],
+                ['yj', 'ый'],
+                ['uj', 'уй'],
+                ['jaj', 'яй'],
+                ['joj', 'ёй'],
+                ['juj', 'юй'],
+                ['a', 'а'],
+                ['b', 'б'],
+                ['c', 'ц'],
+                ['d', 'д'],
+                ['e', 'е'],
+                ['f', 'ф'],
+                ['g', 'г'],
+                ['h', 'х'],
+                ['i', 'и'],
+                ['j', 'ь'],
+                ['k', 'к'],
+                ['l', 'л'],
+                ['m', 'м'],
+                ['n', 'н'],
+                ['o', 'о'],
+                ['p', 'п'],
+                ['q', 'к'],
+                ['r', 'р'],
+                ['s', 'с'],
+                ['t', 'т'],
+                ['u', 'у'],
+                ['v', 'в'],
+                ['w', 'у'],
+                ['x', 'кс'],
+                ['y', 'ы'],
+                ['z', 'з'],
+            ];
+
+            /** @type [string, string][] */
+            const cyrToLatTable = [
+                ['а', 'a'],
+                ['б', 'b'],
+                ['в', 'b'],
+                ['г', 'r'],
+                ['д', 'g'],
+                ['е', 'e'],
+                ['ё', 'ë'],
+                ['ж', 'x'],
+                ['з', '3'],
+                ['и', 'n'],
+                ['й', 'ñ'],
+                ['к', 'k'],
+                ['л', 'n'],
+                ['м', 'm'],
+                ['н', 'h'],
+                ['о', 'o'],
+                ['п', 'n'],
+                ['р', 'r'],
+                ['с', 'c'],
+                ['т', 't'],
+                ['у', 'y'],
+                ['ф', 'ø'],
+                ['х', 'x'],
+                ['ц', 'u'],
+                ['ч', 'y'],
+                ['ш', 'w'],
+                ['щ', 'w'],
+                ['ъ', 'b'],
+                ['ы', 'bi'],
+                ['ь', 'b'],
+                ['ю', 'io'],
+                ['я', 'r'],
+            ];
+
+            /**
+             * @param {string} str
+             * @param {[string, string][]} table
+             */
+            function sub(str, table) {
+                for (const [from, to] of table) {
+                    str = str.replaceAll(new RegExp(from, 'gi'), to);
+                }
+                return str;
+            }
+
+            /**
+             * @param {string} str
+             */
+            function latToCyr(str) {
+                return sub(str, latToCyrTable);
+            }
+
+            /**
+             * @param {string} str
+             */
+            function cyrToLat(str) {
+                return sub(str, cyrToLatTable);
+            }
+
+            const scriptInputEl = /** @type {HTMLSelectElement} */ (document.getElementById('script-input'));
+            const initWordInputEl = /** @type {HTMLInputElement} */ (document.getElementById('init-word-input'));
+            const stepButtonEl = /** @type {HTMLButtonElement} */ (document.getElementById('step-button'));
+            const stepCountInputEl = /** @type {HTMLButtonElement} */ (document.getElementById('step-count-input'));
+            const stepsEl = /** @type {HTMLDivElement} */ (document.getElementById('steps'));
+
+            /** @type {'lat' | 'cyr'} */
+            let script;
+            /** @type {string[]} */
+            let steps;
+
+            function reset() {
+                steps = [initWordInputEl.value];
+                script = scriptInputEl.value;
+                stepsEl.textContent = '';
+            }
+
+            function step() {
+                const lastStep = steps[steps.length - 1];
+
+                /** @type {string} */
+                let step;
+                switch (script) {
+                    case 'lat': { step = latToCyr(lastStep); script = 'cyr'; } break;
+                    case 'cyr': { step = cyrToLat(lastStep); script = 'lat'; } break;
+                }
+                steps.push(step);
+
+                const stepEl = document.createElement('li');
+                stepEl.textContent = step;
+                stepEl.dataset.script = script;
+                stepsEl.append(stepEl);
+            }
+
+            reset();
+            initWordInputEl.addEventListener('input', reset);
+            scriptInputEl.addEventListener('input', reset);
+
+            stepButtonEl.addEventListener('click', () => {
+                const stepCount = Math.min(Number(stepCountInputEl.value), 512);
+                for (let i = 0; i < stepCount; i++) { step(); }
+            });
+        </script>
+    </body>
+</html>
